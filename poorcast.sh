@@ -37,21 +37,22 @@ while true; do
 
   for AUDIO_FILE in "${TRACKS[@]}"; do
     REL_PATH="${AUDIO_FILE#$DIR/}"
-    TIMESTAMP="$(date '+%y%m%d %H%M%S')"
+    TIMESTAMP="$(date '+%y%m%d %H:%M:%S')"
     echo "[$TIMESTAMP] $REL_PATH" >> "$LOGFILE"
     echo "Streaming: $REL_PATH"
 
-    TITLE=$(ffprobe -v error -show_entries format_tags=title -of default=noprint_wrappers=1:nokey=1 "$AUDIO_FILE")
-    # ALBUM=$(ffprobe -v error -show_entries format_tags=album -of default=noprint_wrappers=1:nokey=1 "$AUDIO_FILE")
+sanitize_title() {
+    printf '%s' "$1" | sed -e "s/'/’/g" -e 's/"/”/g' -e 's/:/\\:/g' -e 's/\$/_/g' -e 's/%/_/g'
+}
 
-    [[ -z "$TITLE" ]] && TITLE=$(basename "$AUDIO_FILE")
+RAW_TITLE=$(ffprobe -v error -show_entries format_tags=title \
+  -of default=noprint_wrappers=1:nokey=1 "$AUDIO_FILE")
 
-    escape_for_drawtext() {
-        local text="$1"
-        printf '%s' "$text" | sed "s/['\\:]/\\\\&/g"
-    }
+if [[ -z "${RAW_TITLE// /}" ]]; then
+    RAW_TITLE=$(basename "$AUDIO_FILE") # add .mp3 to cut extension
+fi
 
-    TITLE=$(escape_for_drawtext "$TITLE")
+TITLE=$(sanitize_title "$RAW_TITLE")
 
     taskset -c "$CORE" ffmpeg -loglevel warning -re \
       -loop 1 -framerate 1 -i "$STATIC_COVER" \
